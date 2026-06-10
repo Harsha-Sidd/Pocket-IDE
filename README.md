@@ -110,6 +110,9 @@ The console will output:
     4. Click **Save Configuration**.
     5. Copy the generated `trycloudflare.com` URL or scan the QR code on your phone from any cellular network.
 
+> [!IMPORTANT]
+> **Active Host Requirement:** The public URL and QR code will only remain active as long as the host machine (e.g., your laptop) is powered on, connected to the internet, and running the Node server. If the host machine goes to sleep, loses connection, or is shut down, the Cloudflare tunnel will disconnect. For 24/7 availability without keeping your personal laptop running, see the [Zero-Cost / Low-Cost Hosting Guide](#-zero-cost--low-cost-hosting-guide) below.
+
 ---
 
 ## 📱 Zero-Cost / Low-Cost Hosting Guide
