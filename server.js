@@ -742,14 +742,14 @@ wss.on('connection', (ws, req) => {
       if (parsed.type === 'input') {
         let inputData = parsed.data;
         if (process.platform !== 'win32') {
-          inputData = inputData.replace(/\r\n/g, '\n');
+          inputData = inputData.replace(/\r/g, '');
         }
         shellProcess.stdin.write(inputData);
       }
     } catch (e) {
       let inputData = message.toString();
       if (process.platform !== 'win32') {
-        inputData = inputData.replace(/\r\n/g, '\n');
+        inputData = inputData.replace(/\r/g, '');
       }
       shellProcess.stdin.write(inputData);
     }
