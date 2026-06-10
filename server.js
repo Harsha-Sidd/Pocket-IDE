@@ -740,11 +740,18 @@ wss.on('connection', (ws, req) => {
     try {
       const parsed = JSON.parse(message);
       if (parsed.type === 'input') {
-        shellProcess.stdin.write(parsed.data);
+        let inputData = parsed.data;
+        if (process.platform !== 'win32') {
+          inputData = inputData.replace(/\r\n/g, '\n');
+        }
+        shellProcess.stdin.write(inputData);
       }
     } catch (e) {
-      // Raw string input fallback
-      shellProcess.stdin.write(message.toString());
+      let inputData = message.toString();
+      if (process.platform !== 'win32') {
+        inputData = inputData.replace(/\r\n/g, '\n');
+      }
+      shellProcess.stdin.write(inputData);
     }
   });
 
