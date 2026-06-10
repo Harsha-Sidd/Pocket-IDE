@@ -5,12 +5,14 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
-import { spawn, exec } from 'child_process';
+import { spawn, exec, execSync } from 'child_process';
 import util from 'util';
 
 import dotenv from 'dotenv';
 import { runAgentLoop } from './agent.js';
 import os from 'os';
+import crypto from 'crypto';
+import { bin as cfBin } from 'cloudflared';
 
 dotenv.config();
 
@@ -26,24 +28,52 @@ if (!fs.existsSync(WORKSPACE_DIR)) {
   fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
 }
 
-const execPromise = util.promisify(exec);
-
 let activeTunnel = null;
 let tunnelUrl = null;
 let tunnelPassword = null;
+let isAgentRunning = false;
 
-async function runGitCommand(cmd, cwd = WORKSPACE_DIR) {
-  try {
-    const { stdout, stderr } = await execPromise(cmd, { cwd });
-    return { success: true, stdout: stdout.trim(), stderr: stderr.trim() };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error.message, 
-      stdout: error.stdout ? error.stdout.trim() : '', 
-      stderr: error.stderr ? error.stderr.trim() : '' 
-    };
-  }
+function runGitCommand(args, cwd = WORKSPACE_DIR) {
+  return new Promise((resolve) => {
+    const gitProcess = spawn('git', args, { cwd });
+    let stdout = '';
+    let stderr = '';
+    
+    gitProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    gitProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    gitProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true, stdout: stdout.trim(), stderr: stderr.trim() });
+      } else {
+        resolve({
+          success: false,
+          error: `git command failed with exit code ${code}`,
+          stdout: stdout.trim(),
+          stderr: stderr.trim()
+        });
+      }
+    });
+    
+    gitProcess.on('error', (err) => {
+      resolve({
+        success: false,
+        error: err.message,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      });
+    });
+  });
+}
+
+function redactToken(str, token) {
+  if (!token || !str) return str;
+  return str.split(token).join('<redacted>');
 }
 
 // Authentication middleware for secure global access
@@ -77,7 +107,8 @@ function authMiddleware(req, res, next) {
     token = cookies['pocket_ide_token'];
   }
   
-  if (token === tunnelPassword) {
+  const expectedHash = crypto.createHash('sha256').update(tunnelPassword).digest('hex');
+  if (token === expectedHash) {
     return next();
   }
   
@@ -215,9 +246,23 @@ app.get('/api/files', (req, res) => {
 app.get('/api/file-content', (req, res) => {
   try {
     const filePath = resolvePath(req.query.path || '');
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'File not found' });
     }
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+    
+    // Limit to 2MB (2 * 1024 * 1024 bytes)
+    const MAX_SIZE = 2 * 1024 * 1024;
+    if (stat.size > MAX_SIZE) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `File is too large to display (${(stat.size / (1024 * 1024)).toFixed(2)} MB). Maximum supported size is 2.00 MB.` 
+      });
+    }
+    
     const content = fs.readFileSync(filePath, 'utf-8');
     res.json({ success: true, content });
   } catch (error) {
@@ -327,6 +372,83 @@ app.get('/api/network-info', (req, res) => {
   });
 });
 
+function isCommandWorking(cmd) {
+  try {
+    execSync(`${cmd} --version`, { stdio: 'ignore' });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function getCloudflaredUrl() {
+  const platform = process.platform;
+  const arch = process.arch;
+  
+  if (platform === 'win32') {
+    if (arch === 'arm64') return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-arm64.exe';
+    if (arch === 'ia32') return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-386.exe';
+    return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe';
+  }
+  
+  if (platform === 'darwin') {
+    return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64';
+  }
+  
+  if (platform === 'linux') {
+    if (arch === 'arm64') return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64';
+    if (arch === 'arm') return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm';
+    if (arch === 'ia32') return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-386';
+    return 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64';
+  }
+  
+  throw new Error(`Unsupported platform: ${platform}`);
+}
+
+async function downloadFile(url, destPath) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to download Cloudflare Tunnel binary: ${res.statusText}`);
+  const buffer = await res.arrayBuffer();
+  fs.writeFileSync(destPath, Buffer.from(buffer));
+  if (process.platform !== 'win32') {
+    fs.chmodSync(destPath, 0o755); // make executable
+  }
+}
+
+async function ensureCloudflared() {
+  // 1. Try global system command 'cloudflared'
+  if (isCommandWorking('cloudflared')) {
+    return 'cloudflared';
+  }
+  
+  // 2. Try NPM module bin path
+  const npmBin = cfBin;
+  if (fs.existsSync(npmBin) && isCommandWorking(`"${npmBin}"`)) {
+    return npmBin;
+  }
+  
+  // 3. Try local project root binary
+  const localBinName = process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+  const localPath = path.join(__dirname, localBinName);
+  if (fs.existsSync(localPath) && isCommandWorking(`"${localPath}"`)) {
+    return localPath;
+  }
+  
+  // 4. Download it dynamically to project root if missing or broken!
+  console.log('[Cloudflared] Binary not found or working. Downloading latest release for your platform...');
+  const downloadUrl = getCloudflaredUrl();
+  console.log(`[Cloudflared] Downloading from: ${downloadUrl}`);
+  
+  await downloadFile(downloadUrl, localPath);
+  
+  if (isCommandWorking(`"${localPath}"`)) {
+    console.log(`[Cloudflared] Successfully downloaded and verified local binary at: ${localPath}`);
+    return localPath;
+  }
+  
+  throw new Error('Downloaded Cloudflare Tunnel binary failed verification. Please install cloudflared manually on your system.');
+}
+
 app.post('/api/tunnel/toggle', async (req, res) => {
   const { enabled, password } = req.body;
   
@@ -344,12 +466,9 @@ app.post('/api/tunnel/toggle', async (req, res) => {
       
       tunnelPassword = password;
       
-      const cfPath = path.join(__dirname, 'cloudflared.exe');
-      if (!fs.existsSync(cfPath)) {
-        return res.status(500).json({ success: false, error: 'Cloudflare Tunnel binary (cloudflared.exe) is missing in workspace.' });
-      }
+      const cfPath = await ensureCloudflared();
       
-      console.log('[Cloudflared] Starting secure quick tunnel...');
+      console.log('[Cloudflared] Starting secure quick tunnel using binary:', cfPath);
       activeTunnel = spawn(cfPath, ['tunnel', '--url', `http://localhost:${PORT}`]);
       
       let resolved = false;
@@ -418,7 +537,8 @@ app.post('/api/auth/login', (req, res) => {
     return res.json({ success: true, message: 'No access password set.' });
   }
   if (password === tunnelPassword) {
-    res.json({ success: true, token: tunnelPassword });
+    const expectedHash = crypto.createHash('sha256').update(tunnelPassword).digest('hex');
+    res.json({ success: true, token: expectedHash });
   } else {
     res.status(401).json({ success: false, error: 'Invalid access password' });
   }
@@ -431,9 +551,9 @@ app.get('/api/git/status', async (req, res) => {
     return res.json({ success: true, isRepo: false });
   }
   try {
-    const branchRes = await runGitCommand('git branch --show-current');
+    const branchRes = await runGitCommand(['branch', '--show-current']);
     const branch = branchRes.success ? branchRes.stdout : 'unknown';
-    const statusRes = await runGitCommand('git status --porcelain');
+    const statusRes = await runGitCommand(['status', '--porcelain']);
     let files = [];
     if (statusRes.success && statusRes.stdout) {
       files = statusRes.stdout.split('\n').map(line => {
@@ -465,20 +585,22 @@ app.post('/api/git/clone', async (req, res) => {
       const absPath = path.join(WORKSPACE_DIR, item);
       fs.rmSync(absPath, { recursive: true, force: true });
     }
-    const cloneRes = await runGitCommand(`git clone ${targetUrl} .`);
+    const cloneRes = await runGitCommand(['clone', targetUrl, '.']);
     if (!cloneRes.success) {
-      return res.status(500).json({ success: false, error: cloneRes.stderr || cloneRes.error });
+      const sanitizedError = redactToken(cloneRes.stderr || cloneRes.error, token);
+      return res.status(500).json({ success: false, error: sanitizedError });
     }
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    const sanitizedError = redactToken(err.message, token);
+    res.status(500).json({ success: false, error: sanitizedError });
   }
 });
 
 app.post('/api/git/sync', async (req, res) => {
   const { action, commitMessage, userName, userEmail } = req.body;
   if (action === 'pull') {
-    const pullRes = await runGitCommand('git pull');
+    const pullRes = await runGitCommand(['pull']);
     if (!pullRes.success) {
       return res.status(500).json({ success: false, error: pullRes.stderr || pullRes.error });
     }
@@ -489,17 +611,17 @@ app.post('/api/git/sync', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Commit message is required' });
     }
     try {
-      if (userName) await runGitCommand(`git config user.name "${userName}"`);
-      else await runGitCommand('git config user.name "Pocket IDE User"');
-      if (userEmail) await runGitCommand(`git config user.email "${userEmail}"`);
-      else await runGitCommand('git config user.email "pocket-ide@local.dev"');
+      if (userName) await runGitCommand(['config', 'user.name', userName]);
+      else await runGitCommand(['config', 'user.name', 'Pocket IDE User']);
+      if (userEmail) await runGitCommand(['config', 'user.email', userEmail]);
+      else await runGitCommand(['config', 'user.email', 'pocket-ide@local.dev']);
 
-      await runGitCommand('git add -A');
-      const commitRes = await runGitCommand(`git commit -m "${commitMessage.replace(/"/g, '\\"')}"`);
+      await runGitCommand(['add', '-A']);
+      const commitRes = await runGitCommand(['commit', '-m', commitMessage]);
       if (!commitRes.success) {
         return res.status(500).json({ success: false, error: commitRes.stderr || commitRes.error });
       }
-      const pushRes = await runGitCommand('git push');
+      const pushRes = await runGitCommand(['push']);
       if (!pushRes.success) {
         return res.status(500).json({ success: false, error: pushRes.stderr || pushRes.error });
       }
@@ -532,6 +654,11 @@ app.post('/api/agent/chat', async (req, res) => {
     return res.status(400).json({ success: false, error: 'API Key is required' });
   }
 
+  if (isAgentRunning) {
+    return res.status(429).json({ success: false, error: 'Another AI Agent request is currently running. Please wait.' });
+  }
+  isAgentRunning = true;
+
   // Setup streaming response
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -550,6 +677,8 @@ app.post('/api/agent/chat', async (req, res) => {
   } catch (error) {
     sendEvent('error', { error: error.message });
     res.end();
+  } finally {
+    isAgentRunning = false;
   }
 });
 
@@ -576,7 +705,8 @@ wss.on('connection', (ws, req) => {
         cookies[parts[0].trim()] = parts[1] ? parts[1].trim() : '';
       }
     });
-    if (cookies['pocket_ide_token'] !== tunnelPassword) {
+    const expectedHash = crypto.createHash('sha256').update(tunnelPassword).digest('hex');
+    if (cookies['pocket_ide_token'] !== expectedHash) {
       ws.close(4001, 'Unauthorized');
       return;
     }
