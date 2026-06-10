@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pocket IDE - Authentication</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: hsl(224, 25%, 8%);
+      height: 100vh;
+      width: 100vw;
+      margin: 0;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 380px;
+      padding: 20px;
+    }
+    .login-card {
+      background-color: hsla(224, 20%, 12%, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+      border-radius: 16px;
+      padding: 30px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      text-align: center;
+    }
+    .login-logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .login-logo i {
+      color: #a855f7;
+    }
+    .login-logo span {
+      background: linear-gradient(135deg, #a855f7, #06b6d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .login-card p {
+      font-size: 0.8rem;
+      color: #9ca3af;
+      margin-bottom: 24px;
+      line-height: 1.4;
+    }
+    .login-input-wrapper {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .login-input-wrapper i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #6b7280;
+    }
+    .login-input-wrapper input {
+      width: 100%;
+      height: 44px;
+      border-radius: 8px;
+      padding-left: 38px;
+      padding-right: 12px;
+      background-color: rgba(10, 12, 16, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f3f4f6;
+      outline: none;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+    .login-input-wrapper input:focus {
+      border-color: #a855f7;
+      box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+    }
+    .login-btn {
+      width: 100%;
+      height: 44px;
+      background: linear-gradient(135deg, #a855f7, #6366f1);
+      color: white;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.25);
+      transition: all 0.2s ease;
+    }
+    .login-btn:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+    .login-btn:active {
+      transform: translateY(0);
+    }
+    .login-error {
+      font-size: 0.75rem;
+      color: #ef4444;
+      margin-top: 12px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-logo">
+        <i class="fa-solid fa-laptop-code"></i>
+        <span>Pocket IDE</span>
+      </div>
+      <p>Secure remote workspace. Please enter your workspace access passcode to authenticate.</p>
+      
+      <div class="login-input-wrapper">
+        <i class="fa-solid fa-lock"></i>
+        <input type="password" id="input-password" placeholder="Enter access passcode" />
+      </div>
+      
+      <button class="login-btn" id="btn-login">
+        <span>Verify Access</span>
+        <i class="fa-solid fa-circle-chevron-right"></i>
+      </button>
+      
+      <div class="login-error" id="login-error-msg">Incorrect passcode. Please try again.</div>
+    </div>
+  </div>
+  
+  <script>
+    const inputPassword = document.getElementById('input-password');
+    const btnLogin = document.getElementById('btn-login');
+    const errorMsg = document.getElementById('login-error-msg');
+    
+    async function handleLogin() {
+      const password = inputPassword.value;
+      if (!password) return;
+      
+      btnLogin.disabled = true;
+      btnLogin.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Authenticating...';
+      errorMsg.style.display = 'none';
+      
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+          document.cookie = `pocket_ide_token=${data.token}; path=/; max-age=604800; SameSite=Strict`;
+          window.location.href = '/index.html';
+        } else {
+          errorMsg.style.display = 'block';
+        }
+      } catch (err) {
+        console.error(err);
+        errorMsg.textContent = 'Server error. Please check your connection.';
+        errorMsg.style.display = 'block';
+      } finally {
+        btnLogin.disabled = false;
+        btnLogin.innerHTML = '<span>Verify Access</span> <i class="fa-solid fa-circle-chevron-right"></i>';
+      }
+    }
+    
+    btnLogin.addEventListener('click', handleLogin);
+    inputPassword.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleLogin();
+    });
+  </script>
+</body>
+</html>

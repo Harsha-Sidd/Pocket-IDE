@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pocket IDE - AI-Native Mobile Coding Platform</title>
+  <meta name="description" content="A premium mobile-responsive development environment and AI agent playground to code on the go.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📱</text></svg>">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Inter:wght@100..900&display=swap" rel="stylesheet">
+  
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div id="app" class="app-container">
+    
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="header-logo">
+          <i class="fa-solid stroke-icon fa-laptop-code"></i>
+          <span>Pocket <span class="gradient-text">IDE</span></span>
+        </div>
+        <!-- Live Preview New Tab Button -->
+        <button id="btn-header-preview" class="header-preview-btn" title="Open Live Preview in New Tab">
+          <i class="fa-solid fa-square-up-right"></i>
+          <span>Live Preview</span>
+        </button>
+      </div>
+      <div class="header-actions">
+        <button id="btn-settings" class="btn-icon" title="Settings">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+        <div class="api-status" id="api-status-indicator">
+          <span class="status-dot red"></span>
+          <span class="status-label">No Key</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="workspace">
+      
+      <!-- Column 1: Sidebar (Files & Agent) -->
+      <div class="workspace-col" id="col-sidebar">
+        <!-- Panel 1: File Explorer -->
+        <section id="panel-files" class="panel-section active">
+          <div class="panel-header">
+            <h2><i class="fa-solid fa-folder-tree"></i> Files</h2>
+            <div class="panel-actions">
+              <button id="btn-new-file" title="New File"><i class="fa-solid fa-file-circle-plus"></i></button>
+              <button id="btn-new-folder" title="New Folder"><i class="fa-solid fa-folder-plus"></i></button>
+              
+              <!-- Upload Dropdown Container -->
+              <div class="dropdown-container">
+                <button id="btn-upload-menu" title="Upload"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+                <div id="upload-dropdown" class="dropdown-menu">
+                  <button id="opt-upload-files"><i class="fa-solid fa-file"></i> Upload Files</button>
+                  <button id="opt-upload-folder"><i class="fa-solid fa-folder-open"></i> Upload Folder</button>
+                </div>
+              </div>
+              
+              <button id="btn-refresh-files" title="Refresh"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+          </div>
+          <div class="panel-content">
+            <div id="file-explorer-tree" class="file-tree">
+              <!-- Dynamic tree items go here -->
+              <div class="empty-state">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <p>Loading files...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 3: AI Coding Agent -->
+        <section id="panel-agent" class="panel-section">
+          <div class="panel-header">
+            <h2><i class="fa-solid fa-robot"></i> Coding Agent</h2>
+            <div class="panel-actions">
+              <button id="btn-clear-chat" title="Clear Chat"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+          </div>
+          <div class="panel-content chat-container">
+            <div id="chat-messages" class="chat-messages">
+              <div class="message system">
+                <div class="message-content" style="padding: 12px;">
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <strong style="color: hsl(var(--color-primary)); font-size: 0.85rem;"><i class="fa-solid fa-robot"></i> Let's build something epic!</strong>
+                    <span style="font-size: 0.75rem; color: hsl(var(--text-muted)); line-height: 1.35;">I'm your AI sidekick. Tell me what to code and watch the magic happen!</span>
+                    <small style="font-size: 0.7rem; color: hsl(var(--color-accent)); display: flex; align-items: center; gap: 4px; margin-top: 2px;"><i class="fa-solid fa-circle-info"></i> Set your API Key in Settings first.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Live Agent Status Banner -->
+            <div id="agent-status-banner" class="agent-status-banner hidden">
+              <i class="fa-solid fa-circle-notch fa-spin"></i>
+              <span id="agent-status-text">Thinking...</span>
+            </div>
+            <div class="chat-input-bar">
+              <input type="text" id="chat-input" placeholder="Ask agent to build something... (e.g. 'Build a todo app')" />
+              <button id="btn-send-chat" class="btn-primary-gradient"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Panel 5: Git Version Control -->
+        <section id="panel-git" class="panel-section">
+          <div class="panel-header">
+            <h2><i class="fa-solid fa-code-branch"></i> Version Control</h2>
+            <div class="panel-actions">
+              <button id="btn-refresh-git" title="Refresh Git"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+          </div>
+          <div class="panel-content git-panel-content">
+            <div id="git-empty-state" class="git-state-section">
+              <div class="git-note">
+                <i class="fa-solid fa-circle-info"></i> Cloning will replace current workspace files.
+              </div>
+              <div class="form-group">
+                <label for="input-git-url">Git Repository URL</label>
+                <input type="text" id="input-git-url" placeholder="https://github.com/user/repo.git" />
+              </div>
+              <div class="form-group">
+                <label for="input-git-token">Personal Access Token (Optional)</label>
+                <input type="password" id="input-git-token" placeholder="GitHub Personal Access Token" />
+              </div>
+              <button id="btn-git-clone" class="btn-primary-gradient w-full"><i class="fa-solid fa-cloud-arrow-down"></i> Clone Repository</button>
+            </div>
+
+            <div id="git-active-state" class="git-state-section hidden">
+              <div class="git-branch-info">
+                <i class="fa-solid fa-code-fork"></i> Branch: <span id="git-branch-name">main</span>
+              </div>
+              
+              <div class="git-actions-row">
+                <button id="btn-git-pull" class="btn-primary-gradient w-full"><i class="fa-solid fa-cloud-arrow-down"></i> Pull Changes</button>
+                <button id="btn-git-disconnect" class="btn-git-disconnect w-full"><i class="fa-solid fa-unlink"></i> Disconnect Repo</button>
+              </div>
+
+              <div class="git-changes-section">
+                <h4>Changes (<span id="git-changes-count">0</span>)</h4>
+                <div id="git-changes-list" class="git-changes-list">
+                  <!-- Dynamic git changes go here -->
+                </div>
+              </div>
+
+              <div class="git-commit-box">
+                <div class="form-group">
+                  <textarea id="input-git-commit-msg" placeholder="Commit message (e.g. fix: layout issues)..."></textarea>
+                </div>
+                <button id="btn-git-commit-push" class="btn-primary-gradient w-full"><i class="fa-solid fa-cloud-arrow-up"></i> Commit & Push Changes</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Vertical Resizer Handle -->
+      <div id="sidebar-resizer" class="sidebar-resizer">
+        <div class="resizer-handle"></div>
+      </div>
+
+      <!-- Column 2: Editor & Terminal -->
+      <div class="workspace-col" id="col-main">
+        <!-- Horizontal Row containing Editor & Image Viewer -->
+        <div id="editor-row" class="workspace-row-resizable">
+          <!-- Panel 2: Code Editor -->
+          <section id="panel-editor" class="panel-section">
+            <div class="panel-header">
+              <h2 id="active-filename"><i class="fa-solid fa-code"></i> Editor (No File Open)</h2>
+              <div class="panel-actions">
+                <button id="btn-save-file" class="btn-primary" disabled><i class="fa-solid fa-floppy-disk"></i> Save</button>
+              </div>
+            </div>
+            <div class="panel-content editor-container">
+              <div class="editor-gutter" id="editor-gutter">1</div>
+              <textarea id="editor-textarea" spellcheck="false" placeholder="// Select a file from the explorer to start coding..." disabled></textarea>
+            </div>
+          </section>
+
+          <!-- Panel 6: Image Viewer (hidden by default) -->
+          <section id="panel-image-viewer" class="panel-section">
+            <div class="panel-header">
+              <h2 id="image-viewer-title"><i class="fa-solid fa-image"></i> Image Viewer</h2>
+              <div class="panel-actions">
+                <button id="btn-close-image" title="Close Viewer"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+            <div class="panel-content image-viewer-content">
+              <img id="image-viewer-img" src="" alt="Preview" />
+            </div>
+          </section>
+        </div>
+
+        <!-- Horizontal Editor Resizer Handle -->
+        <div id="editor-resizer" class="editor-resizer">
+          <div class="resizer-handle-horizontal"></div>
+        </div>
+
+        <!-- Panel 4: Live Terminal -->
+        <section id="panel-terminal" class="panel-section">
+          <div class="panel-header">
+            <h2><i class="fa-solid fa-terminal"></i> Terminal</h2>
+            <div class="panel-actions">
+              <button id="btn-clear-terminal" title="Clear Terminal"><i class="fa-solid fa-eraser"></i></button>
+            </div>
+          </div>
+          <div class="panel-content terminal-container">
+            <div id="terminal-output" class="terminal-output"></div>
+            <div class="terminal-input-line">
+              <span class="prompt">$</span>
+              <input type="text" id="terminal-input" placeholder="Type command and press Enter..." />
+            </div>
+          </div>
+        </section>
+      </div>
+
+    </main>
+
+    <!-- Mobile Navigation Tab Bar -->
+    <nav class="mobile-nav">
+      <button class="nav-item active" data-target="panel-files">
+        <i class="fa-solid fa-folder-tree"></i>
+        <span>Files</span>
+      </button>
+      <button class="nav-item" data-target="panel-editor">
+        <i class="fa-solid fa-code"></i>
+        <span>Editor</span>
+      </button>
+      <button class="nav-item" data-target="panel-agent">
+        <i class="fa-solid fa-robot"></i>
+        <span>Agent</span>
+      </button>
+      <button class="nav-item" data-target="panel-git">
+        <i class="fa-solid fa-code-branch"></i>
+        <span>Git</span>
+      </button>
+      <button class="nav-item" data-target="panel-terminal">
+        <i class="fa-solid fa-terminal"></i>
+        <span>Term</span>
+      </button>
+    </nav>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-sliders"></i> IDE Settings</h3>
+          <button id="btn-close-settings" class="btn-icon"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="select-provider">API Provider</label>
+            <select id="select-provider">
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="input-api-key" id="label-api-key">Gemini API Key</label>
+            <input type="password" id="input-api-key" placeholder="Enter Gemini API Key (saved locally)" />
+            <small class="form-help" id="help-api-key">Enter your Google Gemini API key to enable the AI Coding Agent. The key is stored locally in your browser's LocalStorage.</small>
+          </div>
+          <div class="form-group">
+            <label for="select-model">AI Model Selection</label>
+            <select id="select-model">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="select-theme">Visual Theme</label>
+            <select id="select-theme">
+              <option value="theme-midnight">Midnight Blue (Default)</option>
+              <option value="theme-cyberpunk">Cyberpunk (Neon)</option>
+              <option value="theme-light">Light Mode (Clean)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="input-font-size">Editor Font Size: <span id="val-font-size">14px</span></label>
+            <div class="slider-container">
+              <input type="range" id="input-font-size" min="10" max="24" step="1" value="14" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Workspace Path</label>
+            <input type="text" value="pocket-ide/workspace" disabled class="input-disabled" />
+          </div>
+          <div class="form-group border-top-divider">
+            <label class="section-label">Global Access (Work from Anywhere)</label>
+            <div class="toggle-container">
+              <input type="checkbox" id="check-global-access" />
+              <label for="check-global-access">Enable Public Tunnel URL</label>
+            </div>
+          </div>
+          <div class="form-group" id="group-tunnel-password" style="display: none;">
+            <label for="input-tunnel-password">Workspace Access Password</label>
+            <input type="password" id="input-tunnel-password" placeholder="Set a password for remote devices" />
+            <small class="form-help">Mandatory. Secures your workspace so only you can access it via the public URL.</small>
+          </div>
+          <div class="form-group">
+            <label>Remote Connection (Work from Anywhere)</label>
+            <div class="remote-connect-card">
+              <p class="remote-help-text">Scan the QR code or copy the URL on your mobile device to access this IDE on the go!</p>
+              <div class="qr-container">
+                <img id="qr-code-img" src="" alt="Loading QR code..." />
+              </div>
+              <div class="url-copy-container">
+                <input type="text" id="input-remote-url" readonly value="Detecting network URL..." />
+                <button id="btn-copy-url" title="Copy URL"><i class="fa-solid fa-copy"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-save-settings" class="btn-primary-gradient w-full">Save Configuration</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <input type="file" id="input-upload-files" multiple style="display: none;" />
+  <input type="file" id="input-upload-folder" webkitdirectory directory multiple style="display: none;" />
+  <script src="app.js"></script>
+</body>
+</html>
