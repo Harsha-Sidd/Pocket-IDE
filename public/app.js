@@ -940,7 +940,17 @@ function initTerminalWebSocket() {
   terminalSocket = new WebSocket(wsUrl);
 
   terminalSocket.onopen = () => {
-    writeToTerminal('=== Terminal Session Connected ===\r\n');
+    const banner = 
+`\r\n` +
+` _____             _        _         ___  ____  _____ \r\n` +
+`|  __ \\\\           | |      | |       |_ _||  _ \\\\|  ___|\r\n` +
+`| |__) | ___   ___| | __ __| |_ ______ | | | | | | |_   \r\n` +
+`|  ___/ / _ \\\\ / __| |/ // _\` | __|______|| | | | | |  _|  \r\n` +
+`| |    | (_) | (__|   <| (_| | |_      _| |_| |_| | |___ \r\n` +
+`|_|     \\\\___/ \\\\___|_|\\\\_\\\\\\\\__,_|\\\\__|    |___|____/  |_____|\r\n` +
+`\r\n` +
+`=== Terminal Session Connected ===\r\n\r\n`;
+    writeToTerminal(banner);
   };
 
   terminalSocket.onmessage = (event) => {
