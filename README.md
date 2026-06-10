@@ -52,33 +52,38 @@ Manage repositories directly from the sidebar (desktop) or bottom tab (mobile):
 
 ---
 
-## 📐 Architecture & Security flow
-
-```mermaid
-sequenceDiagram
-    participant MobileClient as Phone/Tablet (External Network)
-    participant Cloudflare as Cloudflare Edge CDN (HTTPS)
-    participant localtunnel as Local cloudflared.exe Tunnel
-    participant NodeServer as Pocket IDE Server (Port 3000)
-    
-    MobileClient->>Cloudflare: GET https://xxx.trycloudflare.com
-    Cloudflare->>localtunnel: Secure Proxy Stream
-    localtunnel->>NodeServer: Forward to localhost:3000
-    Note over NodeServer: authMiddleware checks pocket_ide_token Cookie
-    alt Cookie matches passcode
-        NodeServer-->>MobileClient: Load IDE Workspace & WebSocket Terminal
-    else No Cookie / Invalid Code
-        NodeServer-->>MobileClient: Redirect to /login.html
-    end
-```
-
----
-
 ## 🛠 Prerequisites
 
 *   [Node.js](https://nodejs.org/) (v18.0.0 or higher)
 *   Git command-line client installed and added to your system PATH.
 *   An API Key from your chosen AI provider (obtainable from Google AI Studio, OpenAI Developer Console, or Anthropic Console).
+
+---
+
+## 🔑 Obtaining API Keys
+
+Pocket IDE requires an API Key from at least one of the supported AI providers to run the AI Coding Agent. Follow the instructions below to obtain your keys:
+
+### 1. Google Gemini (Recommended & Free Tier Available)
+*   **Where to get it**: [Google AI Studio](https://aistudio.google.com/)
+*   **Steps**:
+    1. Log in with a Google account.
+    2. Click the **"Get API key"** button on the top left.
+    3. Click **"Create API key"** and copy the generated key.
+
+### 2. OpenAI (GPT-4o / GPT-4o Mini)
+*   **Where to get it**: [OpenAI Developer Platform](https://platform.openai.com/api-keys)
+*   **Steps**:
+    1. Log in or create a developer account.
+    2. Go to the API keys dashboard and click **"Create new secret key"**.
+    3. Ensure you have added billing credits to your OpenAI account to use developer keys.
+
+### 3. Anthropic (Claude 3.5 Sonnet / Haiku)
+*   **Where to get it**: [Anthropic Console](https://console.anthropic.com/)
+*   **Steps**:
+    1. Log in or sign up.
+    2. Navigate to the **"API Keys"** section.
+    3. Click **"Create Key"** (requires loading billing credits onto your developer account first).
 
 ---
 
