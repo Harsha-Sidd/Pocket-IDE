@@ -52,28 +52,6 @@ Manage repositories directly from the sidebar (desktop) or bottom tab (mobile):
 
 ---
 
-## 📐 Architecture & Security flow
-
-```mermaid
-sequenceDiagram
-    participant MobileClient as Phone/Tablet (External Network)
-    participant Cloudflare as Cloudflare Edge CDN (HTTPS)
-    participant localtunnel as Local cloudflared.exe Tunnel
-    participant NodeServer as Pocket IDE Server (Port 3000)
-    
-    MobileClient->>Cloudflare: GET https://xxx.trycloudflare.com
-    Cloudflare->>localtunnel: Secure Proxy Stream
-    localtunnel->>NodeServer: Forward to localhost:3000
-    Note over NodeServer: authMiddleware checks pocket_ide_token Cookie
-    alt Cookie matches passcode
-        NodeServer-->>MobileClient: Load IDE Workspace & WebSocket Terminal
-    else No Cookie / Invalid Code
-        NodeServer-->>MobileClient: Redirect to /login.html
-    end
-```
-
----
-
 ## 🛠 Prerequisites
 
 *   [Node.js](https://nodejs.org/) (v18.0.0 or higher)
