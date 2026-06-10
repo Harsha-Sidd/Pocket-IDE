@@ -25,7 +25,8 @@ const listFilesTool = (workspaceDir) => {
 
 const readFileTool = (workspaceDir, relPath) => {
   const filePath = path.resolve(workspaceDir, relPath);
-  if (!filePath.startsWith(workspaceDir)) {
+  const relative = path.relative(workspaceDir, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
     return { error: 'Access denied: Path is outside workspace.' };
   }
   if (!fs.existsSync(filePath)) {
@@ -36,7 +37,8 @@ const readFileTool = (workspaceDir, relPath) => {
 
 const writeFileTool = (workspaceDir, relPath, content) => {
   const filePath = path.resolve(workspaceDir, relPath);
-  if (!filePath.startsWith(workspaceDir)) {
+  const relative = path.relative(workspaceDir, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
     return { error: 'Access denied: Path is outside workspace.' };
   }
   const dir = path.dirname(filePath);

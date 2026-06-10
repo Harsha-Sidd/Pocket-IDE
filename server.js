@@ -199,7 +199,8 @@ app.use('/workspace-preview', (req, res, next) => {
 // Helper: resolve and validate paths to stay within workspace
 function resolvePath(safePath) {
   const resolved = path.resolve(WORKSPACE_DIR, safePath);
-  if (!resolved.startsWith(WORKSPACE_DIR)) {
+  const relative = path.relative(WORKSPACE_DIR, resolved);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error('Access Denied: Path is outside workspace.');
   }
   return resolved;
