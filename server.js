@@ -12,7 +12,13 @@ import dotenv from 'dotenv';
 import { runAgentLoop } from './agent.js';
 import os from 'os';
 import crypto from 'crypto';
-import { bin as cfBin } from 'cloudflared';
+let cfBin = null;
+try {
+  const cfModule = await import('cloudflared');
+  cfBin = cfModule.bin;
+} catch (err) {
+  // Ignored - will fall back to system commands in ensureCloudflared()
+}
 
 dotenv.config();
 
@@ -424,7 +430,7 @@ async function ensureCloudflared() {
   
   // 2. Try NPM module bin path
   const npmBin = cfBin;
-  if (fs.existsSync(npmBin) && isCommandWorking(`"${npmBin}"`)) {
+  if (npmBin && fs.existsSync(npmBin) && isCommandWorking(`"${npmBin}"`)) {
     return npmBin;
   }
   
